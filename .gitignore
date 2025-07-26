@@ -31,3 +31,6 @@ go.work.sum
 # .idea/
 # .vscode/
 .tool-versions
+
+# in memory db
+twitter.db
