@@ -3,16 +3,18 @@ package tweet
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
+	"github.com/gocql/gocql"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
-	db *gorm.DB
+	db *gocql.Session
 }
 
-func NewHandler(db *gorm.DB) *Handler {
+func NewHandler(db *gocql.Session) *Handler {
 	return &Handler{db: db}
 }
 
@@ -27,45 +29,51 @@ func (h *Handler) CreateTweet(c *gin.Context) {
 		return
 	}
 
+	tweetIdUUID := gocql.UUID(uuid.New())
+
 	newTweet := Tweet{
-		UserID:  input.UserID,
-		Content: input.Content,
+		TweetID:   tweetIdUUID,
+		UserID:    input.UserID,
+		Content:   input.Content,
+		CreatedAt: time.Now(),
 	}
 
-	if err := h.db.Create(&newTweet).Error; err != nil {
+	if err := InsertTweet(h.db, newTweet); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tweet"})
-		return
-	}
-
-	if err := h.db.Preload("User").First(&newTweet, newTweet.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load tweet details"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, newTweet)
 }
 
-func (h *Handler) GetTweet(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+const defaultLimit = 50
+
+func (h *Handler) GetTweetsByUser(c *gin.Context) {
+	// Get user_id from URL parameter
+	userIDStr := c.Param("user_id")
+	userID, err := strconv.ParseUint(userIDStr, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid tweet ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
-	var tweetData Tweet
-	if err := h.db.Preload("User").First(&tweetData, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tweet not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tweet"})
+	// Get limit from query parameter
+	limitStr := c.DefaultQuery("limit", strconv.Itoa(defaultLimit))
+	limit, err := strconv.ParseUint(limitStr, 10, 32)
+	if err != nil {
+		limit = defaultLimit
+	}
+
+	tweets, err := GetTweetsByUser(h.db, uint(userID), uint(limit))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tweets"})
 		return
 	}
 
-	c.JSON(http.StatusOK, tweetData)
+	c.JSON(http.StatusOK, tweets)
 }
 
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/tweets", h.CreateTweet)
-	router.GET("/tweets/:id", h.GetTweet)
+	router.GET("/users/:user_id/tweets", h.GetTweetsByUser)
 }

@@ -1,12 +1,11 @@
 package user
 
-import (
-	"gorm.io/gorm"
-)
+import "time"
 
 // The User model represents a user account in the system.
 type User struct {
-	gorm.Model
+	ID          uint   `gorm:"primaryKey"`
 	Username    string `gorm:"uniqueIndex"`
 	DisplayName string
+	CreatedAt   time.Time
 }

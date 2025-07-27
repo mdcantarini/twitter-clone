@@ -32,12 +32,12 @@ func (h *Handler) FollowUser(c *gin.Context) {
 		return
 	}
 
-	followData := Follow{
+	followData := &Follow{
 		FollowerID: input.FollowerID,
 		FollowedID: input.FollowedID,
 	}
 
-	if err := h.db.Create(&followData).Error; err != nil {
+	if err := InsertFollow(h.db, followData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow user"})
 		return
 	}
@@ -46,20 +46,19 @@ func (h *Handler) FollowUser(c *gin.Context) {
 }
 
 func (h *Handler) UnfollowUser(c *gin.Context) {
-	followerID, err := strconv.Atoi(c.Param("follower_id"))
+	followerID, err := strconv.ParseUint(c.Param("follower_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid follower ID"})
 		return
 	}
 
-	followedID, err := strconv.Atoi(c.Param("followed_id"))
+	followedID, err := strconv.ParseUint(c.Param("followed_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid followed ID"})
 		return
 	}
 
-	if err := h.db.Where("follower_id = ? AND followed_id = ?", followerID, followedID).
-		Delete(&Follow{}).Error; err != nil {
+	if err := RemoveFollow(h.db, uint(followerID), uint(followedID)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow user"})
 		return
 	}
