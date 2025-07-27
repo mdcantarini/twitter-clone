@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # Cassandra database for storing tweets and user timelines
+  cassandra:
+    image: cassandra:4.1
+    container_name: twitter-cassandra
+    ports:
+      - "9042:9042"
+    env_file:
+      - .env
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESC KEYSPACES;'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - twitter-network
+
+  # Runs database migrations for Cassandra
+  cassandra-migrate:
+    image: cassandra:4.1
+    container_name: twitter-cassandra-migrate
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    volumes:
+      - ./migrations/cassandra:/migrations
+    networks:
+      - twitter-network
+    command: /migrations/init-cassandra.sh
+    env_file:
+      - .env
+
+  # User management API (SQLite-based)
+  user-api:
+    build:
+      context: .
+      dockerfile: ./cmd/user-api/Dockerfile
+    container_name: twitter-user-api
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    volumes:
+      - sqlite-data:/data
+    depends_on:
+      - cassandra
+    networks:
+      - twitter-network
+    restart: unless-stopped
+
+  # Tweet creation and retrieval API (Cassandra-based)
+  tweet-api:
+    build:
+      context: .
+      dockerfile: ./cmd/tweet-api/Dockerfile
+    container_name: twitter-tweet-api
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      cassandra-migrate:
+        condition: service_completed_successfully
+    networks:
+      - twitter-network
+    restart: unless-stopped
+
+  # Follow/unfollow relationship API (SQLite-based)
+  follow-api:
+    build:
+      context: .
+      dockerfile: ./cmd/follow-api/Dockerfile
+    container_name: twitter-follow-api
+    ports:
+      - "8083:8083"
+    env_file:
+      - .env
+    volumes:
+      - sqlite-data:/data
+    depends_on:
+      - user-api
+    networks:
+      - twitter-network
+    restart: unless-stopped
+
+  # User timeline/feed API (Cassandra-based)
+  feed-api:
+    build:
+      context: .
+      dockerfile: ./cmd/feed-api/Dockerfile
+    container_name: twitter-feed-api
+    ports:
+      - "8084:8084"
+    env_file:
+      - .env
+    depends_on:
+      cassandra:
+        condition: service_healthy
+      cassandra-migrate:
+        condition: service_completed_successfully
+    networks:
+      - twitter-network
+    restart: unless-stopped
+
+volumes:
+  cassandra-data:
+  sqlite-data:
+
+networks:
+  twitter-network:
+    driver: bridge
