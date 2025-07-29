@@ -8,15 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type Handler struct {
+type Service struct {
 	db *gorm.DB
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
-func (h *Handler) FollowUser(c *gin.Context) {
+func (s *Service) FollowUser(c *gin.Context) {
 	var input struct {
 		FollowerID uint `json:"follower_id" binding:"required"`
 		FollowedID uint `json:"followed_id" binding:"required"`
@@ -37,7 +37,7 @@ func (h *Handler) FollowUser(c *gin.Context) {
 		FollowedID: input.FollowedID,
 	}
 
-	if err := InsertFollow(h.db, followData); err != nil {
+	if err := InsertFollow(s.db, followData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow user"})
 		return
 	}
@@ -45,7 +45,7 @@ func (h *Handler) FollowUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Followed successfully"})
 }
 
-func (h *Handler) UnfollowUser(c *gin.Context) {
+func (s *Service) UnfollowUser(c *gin.Context) {
 	followerID, err := strconv.ParseUint(c.Param("follower_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid follower ID"})
@@ -58,7 +58,7 @@ func (h *Handler) UnfollowUser(c *gin.Context) {
 		return
 	}
 
-	if err := RemoveFollow(h.db, uint(followerID), uint(followedID)); err != nil {
+	if err := RemoveFollow(s.db, uint(followerID), uint(followedID)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow user"})
 		return
 	}
@@ -66,7 +66,29 @@ func (h *Handler) UnfollowUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Unfollowed successfully"})
 }
 
-func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
-	router.POST("/follow", h.FollowUser)
-	router.DELETE("/follow/:follower_id/:followed_id", h.UnfollowUser)
+func (s *Service) GetFollowers(c *gin.Context) {
+	userID, err := strconv.ParseUint(c.Param("user_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var followers []Follow
+	if err := s.db.Where("followed_id = ?", userID).Find(&followers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get followers"})
+		return
+	}
+
+	followerIDs := make([]uint, len(followers))
+	for i, f := range followers {
+		followerIDs[i] = f.FollowerID
+	}
+
+	c.JSON(http.StatusOK, gin.H{"follower_ids": followerIDs})
+}
+
+func (s *Service) RegisterRoutes(router *gin.RouterGroup) {
+	router.POST("/follow", s.FollowUser)
+	router.DELETE("/follow/:follower_id/:followed_id", s.UnfollowUser)
+	router.GET("/users/:user_id/followers", s.GetFollowers)
 }

@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS tweets_by_user (
 ) WITH CLUSTERING ORDER BY (created_at DESC, tweet_id DESC);
 
 -- Table for tweets by ID (for single tweet lookups)
--- Note: This table is referenced in a TODO comment in the repository
 CREATE TABLE IF NOT EXISTS tweets_by_id (
     tweet_id uuid PRIMARY KEY,
     user_id bigint,
