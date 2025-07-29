@@ -8,15 +8,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type Handler struct {
+type Service struct {
 	db *gorm.DB
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
-func (h *Handler) CreateUser(c *gin.Context) {
+func (s *Service) CreateUser(c *gin.Context) {
 	var input struct {
 		Username    string `json:"username" binding:"required"`
 		DisplayName string `json:"display_name" binding:"required"`
@@ -32,7 +32,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		DisplayName: input.DisplayName,
 	}
 
-	user, err := InsertUser(h.db, newUser)
+	user, err := InsertUser(s.db, newUser)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
@@ -41,14 +41,14 @@ func (h *Handler) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
-func (h *Handler) GetUser(c *gin.Context) {
+func (s *Service) GetUser(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
-	user, err := GetUser(h.db, uint(id))
+	user, err := GetUser(s.db, uint(id))
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -61,7 +61,7 @@ func (h *Handler) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
-func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
-	router.POST("/users", h.CreateUser)
-	router.GET("/users/:id", h.GetUser)
+func (s *Service) RegisterRoutes(router *gin.RouterGroup) {
+	router.POST("/users", s.CreateUser)
+	router.GET("/users/:id", s.GetUser)
 }

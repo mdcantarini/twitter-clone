@@ -1,21 +1,48 @@
 package main
 
 import (
+	"log"
+	"os"
+	"strings"
+
 	"github.com/gin-gonic/gin"
+	"github.com/segmentio/kafka-go"
+
 	"github.com/mdcantarini/twitter-clone/internal/db/cassandra"
 	"github.com/mdcantarini/twitter-clone/internal/feed"
-	"log"
 )
 
 func main() {
-	session := cassandra.NewSession([]string{"cassandra:9042"}, "twitter")
+	keyspace := os.Getenv("CASSANDRA_KEYSPACE")
+	if keyspace == "" {
+		keyspace = "twitter_clone"
+	}
+	session := cassandra.NewSession([]string{"cassandra:9042"}, keyspace)
 	defer session.Close()
+
+	// Get Kafka brokers from environment or use default
+	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
+	if kafkaBrokers == "" {
+		kafkaBrokers = "kafka:29092"
+	}
+	brokers := strings.Split(kafkaBrokers, ",")
+
+	// Initialize Kafka reader
+	reader := kafka.NewReader(kafka.ReaderConfig{
+		Brokers: brokers,
+		Topic:   "tweets",
+		GroupID: "feed-service",
+	})
+	// Note: We don't close the reader here since it's used by the consumer goroutine
 
 	router := gin.Default()
 	api := router.Group("/api/v1")
 
-	feedHandler := feed.NewHandler(session)
-	feedHandler.RegisterRoutes(api)
+	feedService := feed.NewService(session, reader)
+	feedService.RegisterRoutes(api)
+
+	// Start the Kafka consumer in a goroutine
+	go feedService.RunTweetQueueConsumer()
 
 	log.Println("feed-api running on :8084")
 	if err := router.Run(":8084"); err != nil {

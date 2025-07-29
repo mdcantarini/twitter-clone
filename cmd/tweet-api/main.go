@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/mdcantarini/twitter-clone/internal/db/cassandra"
+	"github.com/segmentio/kafka-go"
 	"log"
 	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mdcantarini/twitter-clone/internal/db/cassandra"
+
 	"github.com/mdcantarini/twitter-clone/internal/tweet"
 )
 
@@ -36,8 +38,14 @@ func main() {
 	router := gin.Default()
 	api := router.Group("/api/v1")
 
-	tweetHandler := tweet.NewHandler(session)
-	tweetHandler.RegisterRoutes(api)
+	// instantiate kafka producer
+	writer := kafka.NewWriter(kafka.WriterConfig{
+		Brokers: []string{"kafka:9092"},
+		Topic:   "tweets",
+	})
+
+	tweetService := tweet.NewService(session, writer)
+	tweetService.RegisterRoutes(api)
 
 	log.Println("tweet-api running on :8082")
 	if err := router.Run(":8082"); err != nil {

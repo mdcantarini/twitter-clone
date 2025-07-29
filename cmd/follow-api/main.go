@@ -31,8 +31,8 @@ func main() {
 	router := gin.Default()
 	api := router.Group("/api/v1")
 
-	followHandler := follow.NewHandler(db)
-	followHandler.RegisterRoutes(api)
+	followService := follow.NewService(db)
+	followService.RegisterRoutes(api)
 
 	log.Println("follow-api running on :8083")
 	if err := router.Run(":8083"); err != nil {

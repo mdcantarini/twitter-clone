@@ -30,8 +30,8 @@ func main() {
 	router := gin.Default()
 	api := router.Group("/api/v1")
 
-	userHandler := user.NewHandler(db)
-	userHandler.RegisterRoutes(api)
+	userService := user.NewService(db)
+	userService.RegisterRoutes(api)
 
 	log.Println("user-api running on :8081")
 	if err := router.Run(":8081"); err != nil {

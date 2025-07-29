@@ -4,12 +4,21 @@ import "github.com/gocql/gocql"
 
 func InsertTweet(session *gocql.Session, tweet Tweet) error {
 	batch := session.NewBatch(gocql.LoggedBatch)
+
+	// Insert into tweets_by_user (for user’s own profile view)
 	batch.Query(`
 		INSERT INTO tweets_by_user (user_id, created_at, tweet_id, content)
 		VALUES (?, ?, ?, ?)`,
 		tweet.UserID, tweet.CreatedAt, tweet.TweetID, tweet.Content,
 	)
-	// TODO - Insert in tweet_by_id
+
+	// Insert into tweets_by_id (for lookup by ID)
+	batch.Query(`
+		INSERT INTO tweets_by_id (tweet_id, user_id, content, created_at)
+		VALUES (?, ?, ?, ?)`,
+		tweet.TweetID, tweet.UserID, tweet.Content, tweet.CreatedAt,
+	)
+
 	return session.ExecuteBatch(batch)
 }
 
@@ -33,4 +42,20 @@ func GetTweetsByUser(session *gocql.Session, userID uint, limit uint) ([]Tweet, 
 		return nil, err
 	}
 	return tweets, nil
+}
+
+func GetTweetById(session *gocql.Session, tweetId gocql.UUID) (Tweet, error) {
+	var tweet Tweet
+
+	err := session.Query(`
+		SELECT user_id, tweet_id, content, created_at
+		FROM tweets_by_id
+		WHERE tweet_id = ?`,
+		tweetId,
+	).Scan(&tweet.UserID, &tweet.TweetID, &tweet.Content, &tweet.CreatedAt)
+
+	if err != nil {
+		return Tweet{}, err
+	}
+	return tweet, nil
 }
