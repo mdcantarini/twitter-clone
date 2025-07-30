@@ -34,7 +34,7 @@ services:
     env_file:
       - .env
 
-  # TODO - Use postgres instead of SQLite
+  # TODO - Improve! Use postgres instead of SQLite
 
   # Zookeeper - required for Kafka coordination
   zookeeper:

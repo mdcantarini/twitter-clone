@@ -1,19 +1,24 @@
 package user
 
 import (
+	"github.com/mdcantarini/twitter-clone/internal/user/model"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"github.com/mdcantarini/twitter-clone/internal/user/repository"
 )
 
 type Service struct {
-	db *gorm.DB
+	db repository.Repository
 }
 
 func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+	sqlImpl := repository.NewSqlRepositoryImplementation(db)
+
+	return &Service{db: sqlImpl}
 }
 
 func (s *Service) CreateUser(c *gin.Context) {
@@ -27,12 +32,12 @@ func (s *Service) CreateUser(c *gin.Context) {
 		return
 	}
 
-	newUser := &User{
+	newUser := &model.User{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 	}
 
-	user, err := InsertUser(s.db, newUser)
+	user, err := s.db.InsertUser(newUser)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
@@ -48,7 +53,7 @@ func (s *Service) GetUser(c *gin.Context) {
 		return
 	}
 
-	user, err := GetUser(s.db, uint(id))
+	user, err := s.db.GetUser(uint(id))
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})

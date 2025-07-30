@@ -1,4 +1,4 @@
-package followapi
+package follow
 
 import (
 	"encoding/json"
@@ -7,15 +7,17 @@ import (
 	"os"
 )
 
-type Client interface {
-	FetchFollowerIds(userID uint) ([]uint, error)
+type ClientImpl struct{}
+
+func NewFollowClient() ClientImpl {
+	return ClientImpl{}
 }
 
 type FollowerIds struct {
 	FollowerIDs []uint `json:"follower_ids"`
 }
 
-func FetchFollowerIds(userID uint) ([]uint, error) {
+func (ci ClientImpl) FetchFollowerIds(userID uint) ([]uint, error) {
 	url := fmt.Sprintf("http://%s/api/v1/users/%d/follower_ids", os.Getenv("FOLLOW_API_URL"), userID)
 	resp, err := http.Get(url)
 	if err != nil {
