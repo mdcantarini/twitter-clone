@@ -11,18 +11,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
 	"github.com/google/uuid"
-
 	"github.com/segmentio/kafka-go"
+
+	"github.com/mdcantarini/twitter-clone/internal/tweet/repository"
 )
 
 type Service struct {
-	db                  *gocql.Session
+	db                  repository.NoSqlRepositoryImplementation
 	tweetsQueueProducer *kafka.Writer
 }
 
-func NewService(db *gocql.Session, tweetProducer *kafka.Writer) *Service {
+func NewService(session *gocql.Session, tweetProducer *kafka.Writer) *Service {
+	sqlImpl := repository.NewNoSqlRepositoryImplementation(session)
+
 	return &Service{
-		db:                  db,
+		db:                  sqlImpl,
 		tweetsQueueProducer: tweetProducer,
 	}
 }
@@ -58,7 +61,7 @@ func (s *Service) CreateTweet(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
-	err := InsertTweet(s.db, newTweet)
+	err := s.db.InsertTweet(newTweet)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tweet"})
 		return
@@ -110,7 +113,7 @@ func (s *Service) GetTweetsByUser(c *gin.Context) {
 		limit = defaultLimit
 	}
 
-	tweets, err := GetTweetsByUser(s.db, uint(userID), uint(limit))
+	tweets, err := s.db.GetTweetsByUser(uint(userID), uint(limit))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tweets"})
 		return
@@ -123,7 +126,7 @@ func (s *Service) GetTweetById(c *gin.Context) {
 	// Get user_id from URL parameter
 	tweetIdStr := c.Param("tweet_id")
 
-	tweet, err := GetTweetById(s.db, gocql.UUID(uuid.MustParse(tweetIdStr)))
+	tweet, err := s.db.GetTweetById(gocql.UUID(uuid.MustParse(tweetIdStr)))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tweet"})
 		return

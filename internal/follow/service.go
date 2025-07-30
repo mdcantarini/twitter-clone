@@ -6,14 +6,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"github.com/mdcantarini/twitter-clone/internal/follow/repository"
 )
 
 type Service struct {
-	db *gorm.DB
+	db repository.SqlRepositoryImplementation
 }
 
 func NewService(db *gorm.DB) *Service {
-	return &Service{db: db}
+	sqlImpl := repository.NewSqlRepositoryImplementation(db)
+
+	return &Service{db: sqlImpl}
 }
 
 func (s *Service) FollowUser(c *gin.Context) {
@@ -37,7 +41,7 @@ func (s *Service) FollowUser(c *gin.Context) {
 		FollowedID: input.FollowedID,
 	}
 
-	if err := InsertFollow(s.db, followData); err != nil {
+	if err := s.db.InsertFollow(followData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to follow user"})
 		return
 	}
@@ -58,7 +62,7 @@ func (s *Service) UnfollowUser(c *gin.Context) {
 		return
 	}
 
-	if err := RemoveFollow(s.db, uint(followerID), uint(followedID)); err != nil {
+	if err := s.db.RemoveFollow(uint(followerID), uint(followedID)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unfollow user"})
 		return
 	}
@@ -73,8 +77,8 @@ func (s *Service) GetFollowerIds(c *gin.Context) {
 		return
 	}
 
-	var followers []Follow
-	if err := s.db.Where("followed_id = ?", userID).Find(&followers).Error; err != nil {
+	followers, err := s.db.GetFollowers(uint(userID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get followers"})
 		return
 	}

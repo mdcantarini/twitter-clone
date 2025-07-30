@@ -1,4 +1,4 @@
-package tweetapi
+package tweet
 
 import (
 	"encoding/json"
@@ -7,8 +7,10 @@ import (
 	"os"
 )
 
-type Client interface {
-	FetchTweet(tweetID string) (*Tweet, error)
+type ClientImpl struct{}
+
+func NewTweetClient() ClientImpl {
+	return ClientImpl{}
 }
 
 type Tweet struct {
@@ -18,7 +20,7 @@ type Tweet struct {
 	CreatedAt string `json:"CreatedAt"`
 }
 
-func FetchTweet(tweetID string) (*Tweet, error) {
+func (ci ClientImpl) FetchTweet(tweetID string) (*Tweet, error) {
 	url := fmt.Sprintf("http://%s/api/v1/tweet/%s", os.Getenv("TWEET_API_URL"), tweetID)
 	resp, err := http.Get(url)
 	if err != nil {

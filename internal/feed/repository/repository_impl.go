@@ -1,32 +1,25 @@
-package feed
+package repository
 
 import (
 	"github.com/gocql/gocql"
+
+	"github.com/mdcantarini/twitter-clone/internal/feed"
 )
 
-type Repository interface {
-	GetUserTimeline(
-		session *gocql.Session,
-		userID uint,
-		limit int,
-	) ([]FeedEntry, error)
-	InsertUserTimeline(
-		session *gocql.Session,
-		followerIds []uint,
-		createdAt string,
-		tweetId string,
-		userId uint,
-		tweetContent string,
-	) error
+type NoSqlRepositoryImplementation struct {
+	session *gocql.Session
 }
 
-func GetUserTimeline(
-	session *gocql.Session,
+func NewNoSqlRepositoryImplementation(session *gocql.Session) NoSqlRepositoryImplementation {
+	return NoSqlRepositoryImplementation{session}
+}
+
+func (ci *NoSqlRepositoryImplementation) GetUserTimeline(
 	userID uint,
 	limit int,
-) ([]FeedEntry, error) {
-	var feed []FeedEntry
-	iter := session.Query(`
+) ([]feed.FeedEntry, error) {
+	var feed []feed.FeedEntry
+	iter := ci.session.Query(`
 		SELECT tweet_id, author_id, created_at, content
 		FROM user_timeline
 		WHERE user_id = ?
@@ -34,22 +27,21 @@ func GetUserTimeline(
 		userID, limit,
 	).Iter()
 
-	var entry FeedEntry
+	var entry feed.FeedEntry
 	for iter.Scan(&entry.TweetID, &entry.AuthorID, &entry.CreatedAt, &entry.Content) {
 		feed = append(feed, entry)
 	}
 	return feed, iter.Close()
 }
 
-func InsertUserTimeline(
-	session *gocql.Session,
+func (ci *NoSqlRepositoryImplementation) InsertUserTimeline(
 	followerIds []uint,
 	createdAt string,
 	tweetId string,
 	userId uint,
 	tweetContent string,
 ) error {
-	batch := session.NewBatch(gocql.LoggedBatch)
+	batch := ci.session.NewBatch(gocql.LoggedBatch)
 
 	for _, followerId := range followerIds {
 		batch.Query(`
@@ -59,5 +51,5 @@ func InsertUserTimeline(
 		)
 	}
 
-	return session.ExecuteBatch(batch)
+	return ci.session.ExecuteBatch(batch)
 }
