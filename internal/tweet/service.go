@@ -3,6 +3,7 @@ package tweet
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,30 +27,34 @@ func NewService(db *gocql.Session, tweetProducer *kafka.Writer) *Service {
 	}
 }
 
+type CreateTweetRequest struct {
+	UserID  uint   `json:"user_id" binding:"required"`
+	Content string `json:"content" binding:"required"`
+}
+
 type TweetEvent struct {
 	TweetID gocql.UUID `json:"tweet_id"`
 	UserID  uint       `json:"user_id"`
 }
 
 func (s *Service) CreateTweet(c *gin.Context) {
-	var input struct {
-		UserID  uint   `json:"user_id" binding:"required"`
-		Content string `json:"content" binding:"required"`
-	}
+	req := CreateTweetRequest{}
 
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// TODO - Limit content to 280 char
+	if err := validateCreateTweetRequest(req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		return
+	}
 
 	tweetIdUUID := gocql.UUID(uuid.New())
-
 	newTweet := Tweet{
 		TweetID:   tweetIdUUID,
-		UserID:    input.UserID,
-		Content:   input.Content,
+		UserID:    req.UserID,
+		Content:   req.Content,
 		CreatedAt: time.Now(),
 	}
 
@@ -61,7 +66,7 @@ func (s *Service) CreateTweet(c *gin.Context) {
 
 	event := TweetEvent{
 		TweetID: tweetIdUUID,
-		UserID:  input.UserID,
+		UserID:  req.UserID,
 	}
 	payload, _ := json.Marshal(event)
 
@@ -70,14 +75,21 @@ func (s *Service) CreateTweet(c *gin.Context) {
 		Value: payload,
 	}
 
-	// TODO - Find a way to ensure 100% the message post
+	// TODO - Tweet is saved but fan-out can fail - consider this acceptable for now
 	err = s.tweetsQueueProducer.WriteMessages(c.Request.Context(), msg)
 	if err != nil {
-		// TODO - Log error here!
-		fmt.Println(err)
+		log.Printf("Failed to publish tweet event to Kafka: %v", err)
 	}
 
 	c.JSON(http.StatusCreated, newTweet)
+}
+
+func validateCreateTweetRequest(req CreateTweetRequest) error {
+	if len(req.Content) > 280 {
+		return fmt.Errorf("tweet content cannot be longer than 280 characters")
+	}
+
+	return nil
 }
 
 const defaultLimit = 50

@@ -11,7 +11,8 @@ import (
 	"github.com/gocql/gocql"
 	"github.com/segmentio/kafka-go"
 
-	"github.com/mdcantarini/twitter-clone/internal/client"
+	"github.com/mdcantarini/twitter-clone/internal/client/followapi"
+	"github.com/mdcantarini/twitter-clone/internal/client/tweetapi"
 )
 
 type Service struct {
@@ -35,7 +36,7 @@ func (s *Service) GetUserFeed(c *gin.Context) {
 		return
 	}
 
-	feedItems, err := GetUserFeed(s.db, uint(id), userFeedLimit)
+	feedItems, err := GetUserTimeline(s.db, uint(id), userFeedLimit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve feed"})
 		return
@@ -54,12 +55,15 @@ type TweetEvent struct {
 }
 
 func (s *Service) RunTweetQueueConsumer() {
+	log.Println("Starting Kafka consumer for tweets topic...")
 	for {
 		msg, err := s.tweetsQueueConsumer.ReadMessage(context.Background())
 		if err != nil {
 			log.Println("Kafka read error:", err)
 			continue
 		}
+
+		log.Printf("Received message from Kafka: %s", string(msg.Value))
 
 		var tweetEvent TweetEvent
 		if err := json.Unmarshal(msg.Value, &tweetEvent); err != nil {
@@ -68,34 +72,30 @@ func (s *Service) RunTweetQueueConsumer() {
 		}
 
 		// 1. Get tweet from tweet-api
-		tweet, err := client.FetchTweet(tweetEvent.TweetID.String())
+		log.Printf("Fetching tweet %s from tweet-api", tweetEvent.TweetID.String())
+		tweet, err := tweetapi.FetchTweet(tweetEvent.TweetID.String())
 		if err != nil {
 			log.Println("Failed to get tweet:", err)
 			continue
 		}
+		log.Printf("Successfully fetched tweet: %+v", tweet)
 
 		// 2. Get followers from follow-api
-		followers, err := client.FetchFollowers(tweet.UserID)
+		log.Printf("Fetching followers for user %d from follow-api", tweet.UserID)
+		followerIds, err := followapi.FetchFollowerIds(tweet.UserID)
 		if err != nil {
 			log.Println("Failed to get followers:", err)
 			continue
 		}
+		log.Printf("Found %d followers", len(followerIds))
 
-		// 3. Create batch for updating user timeline -FanOut Write pattern
-		batch := s.db.NewBatch(gocql.UnloggedBatch)
-		for _, followerID := range followers {
-			// TODO - move this function to repository
-			batch.Query(`
-			INSERT INTO user_timeline (user_id, created_at, tweet_id, author_id, content)
-			VALUES (?, ?, ?, ?, ?)`,
-				followerID, tweet.CreatedAt, tweetEvent.TweetID, tweet.UserID, tweet.Content,
-			)
-		}
-
-		err = s.db.ExecuteBatch(batch)
+		// 3. Create batch for updating user timeline - FanOut Write pattern
+		err = InsertUserTimeline(s.db, followerIds, tweet.CreatedAt, tweet.TweetID, tweet.UserID, tweet.Content)
 		if err != nil {
 			log.Println("Failed updating user timeline:", err)
 			continue
 		}
+
+		log.Printf("Successfully fan-out tweet %s to %d followers", tweetEvent.TweetID.String(), len(followerIds))
 	}
 }

@@ -15,7 +15,7 @@ import (
 func main() {
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
-		dbPath = "twitter.db"
+		log.Fatal("failed to get DB_PATH env value")
 	}
 
 	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})

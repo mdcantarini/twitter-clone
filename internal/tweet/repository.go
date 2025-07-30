@@ -2,6 +2,12 @@ package tweet
 
 import "github.com/gocql/gocql"
 
+type Repository interface {
+	InsertTweet(session *gocql.Session, tweet Tweet) error
+	GetTweetsByUser(session *gocql.Session, userID uint, limit uint) ([]Tweet, error)
+	GetTweetById(session *gocql.Session, tweetId gocql.UUID) (Tweet, error)
+}
+
 func InsertTweet(session *gocql.Session, tweet Tweet) error {
 	batch := session.NewBatch(gocql.LoggedBatch)
 

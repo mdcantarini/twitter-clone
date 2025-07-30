@@ -4,6 +4,11 @@ import (
 	"gorm.io/gorm"
 )
 
+type Repository interface {
+	InsertFollow(db *gorm.DB, follow *Follow) error
+	RemoveFollow(db *gorm.DB, followerID, followedID uint) error
+}
+
 func InsertFollow(db *gorm.DB, follow *Follow) error {
 	return db.Create(follow).Error
 }

@@ -1,4 +1,4 @@
-package client
+package followapi
 
 import (
 	"encoding/json"
@@ -7,8 +7,16 @@ import (
 	"os"
 )
 
-func FetchFollowers(userID uint) ([]uint, error) {
-	url := fmt.Sprintf("http://%s/api/v1/users/%d/followers", os.Getenv("FOLLOW_API_URL"), userID)
+type Client interface {
+	FetchFollowerIds(userID uint) ([]uint, error)
+}
+
+type FollowerIds struct {
+	FollowerIDs []uint `json:"follower_ids"`
+}
+
+func FetchFollowerIds(userID uint) ([]uint, error) {
+	url := fmt.Sprintf("http://%s/api/v1/users/%d/follower_ids", os.Getenv("FOLLOW_API_URL"), userID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call follow-api: %w", err)
@@ -19,9 +27,7 @@ func FetchFollowers(userID uint) ([]uint, error) {
 		return nil, fmt.Errorf("follow-api responded with status %d", resp.StatusCode)
 	}
 
-	var result struct {
-		FollowerIDs []uint `json:"follower_ids"`
-	}
+	result := FollowerIds{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode follower response: %w", err)
 	}

@@ -16,15 +16,15 @@ func main() {
 	// Get Cassandra configuration from environment
 	cassandraHost := os.Getenv("CASSANDRA_HOST")
 	if cassandraHost == "" {
-		cassandraHost = "localhost"
+		log.Fatal("failed to get CASSANDRA_HOST env value")
 	}
 	cassandraPort := os.Getenv("CASSANDRA_PORT")
 	if cassandraPort == "" {
-		cassandraPort = "9042"
+		log.Fatal("failed to get CASSANDRA_PORT env value")
 	}
 	keyspace := os.Getenv("CASSANDRA_KEYSPACE")
 	if keyspace == "" {
-		keyspace = "twitter_clone"
+		log.Fatal("failed to get CASSANDRA_KEYSPACE env value")
 	}
 
 	hosts := []string{cassandraHost + ":" + cassandraPort}
@@ -40,7 +40,7 @@ func main() {
 
 	// instantiate kafka producer
 	writer := kafka.NewWriter(kafka.WriterConfig{
-		Brokers: []string{"kafka:9092"},
+		Brokers: []string{"kafka:29092"},
 		Topic:   "tweets",
 	})
 
