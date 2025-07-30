@@ -1,6 +1,7 @@
 package user
 
 import (
+	"github.com/mdcantarini/twitter-clone/internal/user/model"
 	"net/http"
 	"strconv"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type Service struct {
-	db repository.SqlRepositoryImplementation
+	db repository.Repository
 }
 
 func NewService(db *gorm.DB) *Service {
@@ -31,7 +32,7 @@ func (s *Service) CreateUser(c *gin.Context) {
 		return
 	}
 
-	newUser := &User{
+	newUser := &model.User{
 		Username:    input.Username,
 		DisplayName: input.DisplayName,
 	}

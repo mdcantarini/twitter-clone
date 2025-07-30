@@ -2,12 +2,10 @@ package repository
 
 import (
 	"github.com/gocql/gocql"
-
-	"github.com/mdcantarini/twitter-clone/internal/tweet"
+	"github.com/mdcantarini/twitter-clone/internal/tweet/model"
 )
 
 type Repository interface {
-	InsertTweet(tweet tweet.Tweet) error
-	GetTweetsByUser(userID uint, limit uint) ([]tweet.Tweet, error)
-	GetTweetById(tweetId gocql.UUID) (tweet.Tweet, error)
+	InsertTweet(tweet model.Tweet) error
+	GetTweetById(tweetId gocql.UUID) (model.Tweet, error)
 }

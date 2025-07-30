@@ -2,10 +2,10 @@ package repository
 
 import (
 	"github.com/gocql/gocql"
-
-	"github.com/mdcantarini/twitter-clone/internal/tweet"
+	"github.com/mdcantarini/twitter-clone/internal/tweet/model"
 )
 
+// TODO - Improve! Add test cases for real implementation
 type NoSqlRepositoryImplementation struct {
 	session *gocql.Session
 }
@@ -14,15 +14,8 @@ func NewNoSqlRepositoryImplementation(session *gocql.Session) NoSqlRepositoryImp
 	return NoSqlRepositoryImplementation{session}
 }
 
-func (ni *NoSqlRepositoryImplementation) InsertTweet(tweetData tweet.Tweet) error {
+func (ni NoSqlRepositoryImplementation) InsertTweet(tweetData model.Tweet) error {
 	batch := ni.session.NewBatch(gocql.LoggedBatch)
-
-	// Insert into tweets_by_user (for user's own profile view)
-	batch.Query(`
-		INSERT INTO tweets_by_user (user_id, created_at, tweet_id, content)
-		VALUES (?, ?, ?, ?)`,
-		tweetData.UserID, tweetData.CreatedAt, tweetData.TweetID, tweetData.Content,
-	)
 
 	// Insert into tweets_by_id (for lookup by ID)
 	batch.Query(`
@@ -34,30 +27,8 @@ func (ni *NoSqlRepositoryImplementation) InsertTweet(tweetData tweet.Tweet) erro
 	return ni.session.ExecuteBatch(batch)
 }
 
-func (ni *NoSqlRepositoryImplementation) GetTweetsByUser(userID uint, limit uint) ([]tweet.Tweet, error) {
-	var tweets []tweet.Tweet
-
-	iter := ni.session.Query(`
-		SELECT user_id, tweet_id, content, created_at
-		FROM tweets_by_user
-		WHERE user_id = ?
-		LIMIT ?`,
-		userID, limit,
-	).Iter()
-
-	var tweetData tweet.Tweet
-	for iter.Scan(&tweetData.UserID, &tweetData.TweetID, &tweetData.Content, &tweetData.CreatedAt) {
-		tweets = append(tweets, tweetData)
-	}
-
-	if err := iter.Close(); err != nil {
-		return nil, err
-	}
-	return tweets, nil
-}
-
-func (ni *NoSqlRepositoryImplementation) GetTweetById(tweetId gocql.UUID) (tweet.Tweet, error) {
-	var tweetData tweet.Tweet
+func (ni NoSqlRepositoryImplementation) GetTweetById(tweetId gocql.UUID) (model.Tweet, error) {
+	var tweetData model.Tweet
 
 	err := ni.session.Query(`
 		SELECT user_id, tweet_id, content, created_at
@@ -67,7 +38,7 @@ func (ni *NoSqlRepositoryImplementation) GetTweetById(tweetId gocql.UUID) (tweet
 	).Scan(&tweetData.UserID, &tweetData.TweetID, &tweetData.Content, &tweetData.CreatedAt)
 
 	if err != nil {
-		return tweet.Tweet{}, err
+		return model.Tweet{}, err
 	}
 	return tweetData, nil
 }

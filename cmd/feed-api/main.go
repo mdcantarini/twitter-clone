@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/mdcantarini/twitter-clone/db/cassandra"
 	"log"
 	"os"
 	"strings"
@@ -8,16 +9,30 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/segmentio/kafka-go"
 
-	"github.com/mdcantarini/twitter-clone/internal/db/cassandra"
 	"github.com/mdcantarini/twitter-clone/internal/feed"
 )
 
 func main() {
+	// get Cassandra configuration from environment
+	cassandraHost := os.Getenv("CASSANDRA_HOST")
+	if cassandraHost == "" {
+		log.Fatal("failed to get CASSANDRA_HOST env value")
+	}
+	cassandraPort := os.Getenv("CASSANDRA_PORT")
+	if cassandraPort == "" {
+		log.Fatal("failed to get CASSANDRA_PORT env value")
+	}
 	keyspace := os.Getenv("CASSANDRA_KEYSPACE")
 	if keyspace == "" {
 		log.Fatal("failed to get CASSANDRA_KEYSPACE env value")
 	}
-	session := cassandra.NewSession([]string{"cassandra:9042"}, keyspace)
+
+	hosts := []string{cassandraHost + ":" + cassandraPort}
+	if cassandraNodes := os.Getenv("CASSANDRA_NODES"); cassandraNodes != "" {
+		hosts = strings.Split(cassandraNodes, ",")
+	}
+
+	session := cassandra.NewSession(hosts, keyspace)
 	defer session.Close()
 
 	// Get Kafka brokers from environment or use default
@@ -29,12 +44,10 @@ func main() {
 
 	// Initialize Kafka reader
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:     brokers,
-		Topic:       "tweets",
-		GroupID:     "feed-service-v4",
-		StartOffset: kafka.FirstOffset,
+		Brokers: brokers,
+		Topic:   "tweets",
+		GroupID: "feed-service-v1",
 	})
-	// Note: We don't close the reader here since it's used by the consumer goroutine
 
 	router := gin.Default()
 	api := router.Group("/api/v1")
@@ -47,6 +60,6 @@ func main() {
 
 	log.Println("feed-api running on :8084")
 	if err := router.Run(":8084"); err != nil {
-		log.Fatal("Failed to start server:", err)
+		log.Fatal("failed to start server:", err)
 	}
 }

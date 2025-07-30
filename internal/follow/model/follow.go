@@ -1,4 +1,4 @@
-package follow
+package model
 
 import "time"
 

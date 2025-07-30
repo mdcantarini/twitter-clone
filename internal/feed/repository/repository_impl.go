@@ -2,23 +2,23 @@ package repository
 
 import (
 	"github.com/gocql/gocql"
-
-	"github.com/mdcantarini/twitter-clone/internal/feed"
+	"github.com/mdcantarini/twitter-clone/internal/feed/model"
 )
 
+// TODO - Improve! Add test cases for real implementation
 type NoSqlRepositoryImplementation struct {
 	session *gocql.Session
 }
 
-func NewNoSqlRepositoryImplementation(session *gocql.Session) NoSqlRepositoryImplementation {
-	return NoSqlRepositoryImplementation{session}
+func NewNoSqlRepositoryImplementation(session *gocql.Session) *NoSqlRepositoryImplementation {
+	return &NoSqlRepositoryImplementation{session}
 }
 
 func (ci *NoSqlRepositoryImplementation) GetUserTimeline(
 	userID uint,
 	limit int,
-) ([]feed.FeedEntry, error) {
-	var feed []feed.FeedEntry
+) ([]model.FeedEntry, error) {
+	var feeds []model.FeedEntry
 	iter := ci.session.Query(`
 		SELECT tweet_id, author_id, created_at, content
 		FROM user_timeline
@@ -27,11 +27,11 @@ func (ci *NoSqlRepositoryImplementation) GetUserTimeline(
 		userID, limit,
 	).Iter()
 
-	var entry feed.FeedEntry
+	var entry model.FeedEntry
 	for iter.Scan(&entry.TweetID, &entry.AuthorID, &entry.CreatedAt, &entry.Content) {
-		feed = append(feed, entry)
+		feeds = append(feeds, entry)
 	}
-	return feed, iter.Close()
+	return feeds, iter.Close()
 }
 
 func (ci *NoSqlRepositoryImplementation) InsertUserTimeline(

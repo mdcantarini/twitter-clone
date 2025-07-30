@@ -3,9 +3,10 @@ package tweet
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mdcantarini/twitter-clone/internal/tweet/model"
+	messagebroker "github.com/mdcantarini/twitter-clone/messagebroker/kafka"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,16 +18,16 @@ import (
 )
 
 type Service struct {
-	db                  repository.NoSqlRepositoryImplementation
-	tweetsQueueProducer *kafka.Writer
+	db                    repository.Repository
+	tweetsMessageProducer messagebroker.Producer
 }
 
 func NewService(session *gocql.Session, tweetProducer *kafka.Writer) *Service {
 	sqlImpl := repository.NewNoSqlRepositoryImplementation(session)
 
 	return &Service{
-		db:                  sqlImpl,
-		tweetsQueueProducer: tweetProducer,
+		db:                    sqlImpl,
+		tweetsMessageProducer: tweetProducer,
 	}
 }
 
@@ -49,12 +50,12 @@ func (s *Service) CreateTweet(c *gin.Context) {
 	}
 
 	if err := validateCreateTweetRequest(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	tweetIdUUID := gocql.UUID(uuid.New())
-	newTweet := Tweet{
+	newTweet := model.Tweet{
 		TweetID:   tweetIdUUID,
 		UserID:    req.UserID,
 		Content:   req.Content,
@@ -78,8 +79,8 @@ func (s *Service) CreateTweet(c *gin.Context) {
 		Value: payload,
 	}
 
-	// TODO - Tweet is saved but fan-out can fail - consider this acceptable for now
-	err = s.tweetsQueueProducer.WriteMessages(c.Request.Context(), msg)
+	// TODO - Improve! Tweet is saved but fan-out can fail.
+	err = s.tweetsMessageProducer.WriteMessages(c.Request.Context(), msg)
 	if err != nil {
 		log.Printf("Failed to publish tweet event to Kafka: %v", err)
 	}
@@ -95,33 +96,7 @@ func validateCreateTweetRequest(req CreateTweetRequest) error {
 	return nil
 }
 
-const defaultLimit = 50
-
-func (s *Service) GetTweetsByUser(c *gin.Context) {
-	// Get user_id from URL parameter
-	userIDStr := c.Param("user_id")
-	userID, err := strconv.ParseUint(userIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	// Get limit from query parameter
-	limitStr := c.DefaultQuery("limit", strconv.Itoa(defaultLimit))
-	limit, err := strconv.ParseUint(limitStr, 10, 32)
-	if err != nil {
-		limit = defaultLimit
-	}
-
-	tweets, err := s.db.GetTweetsByUser(uint(userID), uint(limit))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tweets"})
-		return
-	}
-
-	c.JSON(http.StatusOK, tweets)
-}
-
+// TODO - Improve! Add mechanism to cache hot tweets
 func (s *Service) GetTweetById(c *gin.Context) {
 	// Get user_id from URL parameter
 	tweetIdStr := c.Param("tweet_id")
@@ -138,5 +113,4 @@ func (s *Service) GetTweetById(c *gin.Context) {
 func (s *Service) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/tweets", s.CreateTweet)
 	router.GET("/tweet/:tweet_id", s.GetTweetById)
-	router.GET("/users/:user_id/tweets", s.GetTweetsByUser)
 }
