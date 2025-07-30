@@ -1,4 +1,4 @@
-package client
+package tweetapi
 
 import (
 	"encoding/json"
@@ -7,11 +7,15 @@ import (
 	"os"
 )
 
+type Client interface {
+	FetchTweet(tweetID string) (*Tweet, error)
+}
+
 type Tweet struct {
-	TweetID   string `json:"tweet_id"`
-	UserID    uint   `json:"user_id"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"created_at"`
+	TweetID   string `json:"TweetID"`
+	UserID    uint   `json:"UserID"`
+	Content   string `json:"Content"`
+	CreatedAt string `json:"CreatedAt"`
 }
 
 func FetchTweet(tweetID string) (*Tweet, error) {

@@ -66,7 +66,7 @@ func (s *Service) UnfollowUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Unfollowed successfully"})
 }
 
-func (s *Service) GetFollowers(c *gin.Context) {
+func (s *Service) GetFollowerIds(c *gin.Context) {
 	userID, err := strconv.ParseUint(c.Param("user_id"), 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
@@ -90,5 +90,5 @@ func (s *Service) GetFollowers(c *gin.Context) {
 func (s *Service) RegisterRoutes(router *gin.RouterGroup) {
 	router.POST("/follow", s.FollowUser)
 	router.DELETE("/follow/:follower_id/:followed_id", s.UnfollowUser)
-	router.GET("/users/:user_id/followers", s.GetFollowers)
+	router.GET("/users/:user_id/follower_ids", s.GetFollowerIds)
 }
