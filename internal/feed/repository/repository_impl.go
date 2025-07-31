@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/gocql/gocql"
+
 	"github.com/mdcantarini/twitter-clone/internal/feed/model"
 )
 
@@ -41,13 +44,19 @@ func (ci *NoSqlRepositoryImplementation) InsertUserTimeline(
 	userId uint,
 	tweetContent string,
 ) error {
+	// Parse the string timestamp into time.Time
+	timestamp, err := time.Parse(time.RFC3339Nano, createdAt)
+	if err != nil {
+		return err
+	}
+
 	batch := ci.session.NewBatch(gocql.LoggedBatch)
 
 	for _, followerId := range followerIds {
 		batch.Query(`
 			INSERT INTO user_timeline (user_id, created_at, tweet_id, author_id, content)
 			VALUES (?, ?, ?, ?, ?)`,
-			followerId, createdAt, tweetId, userId, tweetContent,
+			followerId, timestamp, tweetId, userId, tweetContent,
 		)
 	}
 

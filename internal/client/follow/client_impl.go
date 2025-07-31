@@ -18,7 +18,7 @@ type FollowerIds struct {
 }
 
 func (ci ClientImpl) FetchFollowerIds(userID uint) ([]uint, error) {
-	url := fmt.Sprintf("http://%s/api/v1/users/%d/follower_ids", os.Getenv("FOLLOW_API_URL"), userID)
+	url := fmt.Sprintf("http://%s/api/v1/users/%d/followers", os.Getenv("FOLLOW_API_URL"), userID)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call follow-api: %w", err)

@@ -136,11 +136,17 @@ services:
       - "8084:8084"
     env_file:
       - .env
+    environment:
+      KAFKA_BROKERS: kafka:29092
+      FOLLOW_API_URL: follow-api:8083
+      TWEET_API_URL: tweet-api:8082
     depends_on:
       cassandra:
         condition: service_healthy
       cassandra-migrate:
         condition: service_completed_successfully
+      kafka:
+        condition: service_started
     networks:
       - twitter-network
     restart: unless-stopped
