@@ -180,7 +180,6 @@ GET /api/v1/feed/{user_id}
 - **No API versioning** strategy beyond `/api/v1`
 - **Recommendation**: Standardize REST conventions and implement proper API versioning
 
-### 9. Scalability Concerns
-- **Single Kafka partition** for all tweets
-- **No sharding strategy** for Cassandra
-- **Recommendation**: Implement partitioning strategies based on user_id or timestamp
+### 9. Config Management
+- **Single Env config** for all the services
+- **Recommendation**: Implement configs per service
